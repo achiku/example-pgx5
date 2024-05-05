@@ -10,7 +10,20 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-txdb"
+	_ "github.com/jackc/pgx/stdlib"
 )
+
+type defaultSavePoint struct{}
+
+func (dsp defaultSavePoint) Create(id string) string {
+	return fmt.Sprintf("SAVEPOINT %s", id)
+}
+func (dsp defaultSavePoint) Release(id string) string {
+	return fmt.Sprintf("RELEASE SAVEPOINT %s", id)
+}
+func (dsp defaultSavePoint) Rollback(id string) string {
+	return fmt.Sprintf("ROLLBACK TO SAVEPOINT %s", id)
+}
 
 func TestingNewDB(t *testing.T) (*sql.DB, func()) {
 	cfg := dbConfig{
@@ -21,7 +34,8 @@ func TestingNewDB(t *testing.T) (*sql.DB, func()) {
 		Port:         "5432",
 		SSLMode:      "disable",
 	}
-	db := sql.OpenDB(txdb.New("pgx", cfg.URL()))
+	var sp defaultSavePoint
+	db := sql.OpenDB(txdb.New("pgx", cfg.URL(), txdb.SavePointOption(sp)))
 	return db, func() {
 		db.Close()
 	}
@@ -36,7 +50,8 @@ func TestingNewTx(t *testing.T) (*sql.Tx, func()) {
 		Port:         "5432",
 		SSLMode:      "disable",
 	}
-	db := sql.OpenDB(txdb.New("pgx", cfg.URL()))
+	var sp defaultSavePoint
+	db := sql.OpenDB(txdb.New("pgx", cfg.URL(), txdb.SavePointOption(sp)))
 	tx, err := db.Begin()
 	if err != nil {
 		t.Fatal(err)
